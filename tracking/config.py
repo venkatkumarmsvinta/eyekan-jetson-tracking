@@ -48,3 +48,11 @@ SKELETON = [(5, 7), (7, 9), (6, 8), (8, 10), (5, 6), (5, 11), (6, 12), (11, 12),
 CSV_COLUMNS = ["frame", "time_s", "track_id", "tracker_id", "x1", "y1", "x2", "y2", "conf",
                "face_conf", "facing", "head_x", "head_y", "foot_x_px", "foot_y_px", "foot_from",
                "floor_x", "floor_y", "floor_unit"]
+
+# ---------- multi-camera ----------
+# Frame offset per camera so that the same frame index = the same moment, from the burned-in clocks
+# (tools/sync_clocks.py): camera1 frame 6 = 04:01:46, camera6 frame 1 = 04:00:52
+# -> camera6 frame = camera1 frame + 805 (+/-1 frame). Both record at exactly 15 fps (no drift).
+CAMERA_GROUPS = {
+    "store_test": {"camera1": 0, "camera6": 805},
+}
