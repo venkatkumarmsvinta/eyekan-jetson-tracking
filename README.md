@@ -55,7 +55,11 @@ on purpose, a new ID is safer than a wrong one.
 track.py                 entry point: python track.py <video>
 calibrate_floor.py       one-time floor calibration per camera (chessboard -> metres)
 requirements.txt
+tools/
+├── sync_clocks.py       frame offset between two recordings from the burned-in clock
+└── calibrate_3d.py      3D camera calibration from measured store points (multi-camera)
 tracking/
+├── camera.py            calibrated camera: store metres <-> pixels (head/feet -> floor position)
 ├── config.py            ALL settings (thresholds, poster zones, model names, CSV columns)
 ├── pipeline.py          the per-frame loop: detect → pose → track → ReLink → outputs
 ├── detection.py         RF-DETR models, poster filter, duplicate-box removal
@@ -142,6 +146,48 @@ Without it, floor positions are in image pixels. With it, in metres.
 3. Check `calibration/camera1_check.jpg`: the drawn 0.5 m grid must lie flat on the floor.
 
 `track.py` loads `calibration/<video name>.json` automatically for the video with the same name.
+
+## Multi-camera preparation (branch `multicamera-tracking`)
+
+Goal: the same person keeps the same ID across cameras that see the same area (now: camera1 + camera6).
+Two things are needed first: the videos in sync, and every camera calibrated in one store coordinate system.
+
+### 1. Sync the recordings (burned-in clock)
+
+```bash
+python tools/sync_clocks.py videos/camera1.mp4 videos/camera6.mp4
+# read the two times on output/sync/*_first_tick.png, then:
+python tools/sync_clocks.py videos/camera1.mp4 videos/camera6.mp4 --times 04:01:46 04:00:52
+# -> RESULT: camera6 frame = camera1 frame +805 ; check output/sync/camera1_camera6_check.jpg
+```
+
+Put the result in `CAMERA_GROUPS` in `tracking/config.py` (camera1 + camera6 is already there).
+
+### 2. Calibrate each camera in 3D
+
+1. Pick one origin (0, 0) on the store floor (e.g. a wall corner). Measure points the cameras see, in metres:
+   x and y along the floor, z = height. At least 6 per camera, at least 2 of them **not** on the floor
+   (counter top corners, poster corners, top of a sign). Write them in `calibration/store_points.csv`:
+   ```
+   name,x,y,z
+   A1_counter_top_near_trial_room,2.10,3.40,0.95
+   E1_floor_tile_corner,4.00,1.20,0
+   ```
+   One file for all cameras. The cameras do not need to see the same points, only the same origin.
+2. Click the points each camera sees, on a frame without people in front of them (zoom window helps;
+   `n` = skip a point the camera can't see, `u` = undo, `q` = save):
+   ```bash
+   python tools/calibrate_3d.py click camera1 --frame 3375
+   python tools/calibrate_3d.py click camera6 --frame 4180
+   ```
+3. Compute (prints the error per point; points over 15 px are probably a wrong measurement or click):
+   ```bash
+   python tools/calibrate_3d.py solve camera1 --frame 3375 --distortion
+   python tools/calibrate_3d.py solve camera6 --frame 4180 --distortion
+   ```
+   Check `calibration/<camera>_check.jpg`: the 0.5 m floor grid must lie flat on the floor and the red 1.7 m
+   posts must look as tall as a person. The JSON also contains a floor homography, so `track.py` gives floor
+   positions in metres for these cameras too. Use `--distortion` with 8+ points.
 
 ## Output (`output/<video name>/`)
 
