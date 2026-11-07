@@ -1,0 +1,21 @@
+# local Python environments
+venv/
+venv-rfdetr/
+__pycache__/
+*.pyc
+
+# store CCTV footage and results: people's faces, never on GitHub
+videos/
+output/
+*.mp4
+
+# model weights (downloaded automatically; GitHub limit is 100 MB)
+*.pth
+*.pt
+*.onnx
+*.engine
+
+# per-camera floor calibration (site specific)
+calibration/
+
+.DS_Store
