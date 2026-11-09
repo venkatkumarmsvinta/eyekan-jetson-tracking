@@ -19,3 +19,12 @@ output/
 calibration/
 
 .DS_Store
+
+# staff face photos downloaded from Supabase
+staff_photos/
+
+# secrets (Supabase sign-in)
+.env
+
+# staff photo sync log (cron)
+logs/

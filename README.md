@@ -147,6 +147,15 @@ Without it, floor positions are in image pixels. With it, in metres.
 
 `track.py` loads `calibration/<video name>.json` automatically for the video with the same name.
 
+### Staff photos (Supabase)
+
+Credentials in `.env` (copy `.env.example`). `track.py` refreshes `staff_photos/` at start (`--no-sync` to skip):
+only new photos are downloaded; photos of people no longer active or without consent are removed.
+Daily refresh at 06:00 on the Jetson (`crontab -e`):
+```
+0 6 * * *  cd /home/<user>/jetson-multi-tracking && venv-rfdetr/bin/python -m tracking.db >> logs/staff_sync.log 2>&1
+```
+
 ## Multi-camera preparation (branch `multicamera-tracking`)
 
 Goal: the same person keeps the same ID across cameras that see the same area (now: camera1 + camera6).

@@ -56,3 +56,7 @@ CSV_COLUMNS = ["frame", "time_s", "track_id", "tracker_id", "x1", "y1", "x2", "y
 CAMERA_GROUPS = {
     "store_test": {"camera1": 0, "camera6": 805},
 }
+
+# ---------- database (Supabase, see tracking/db.py) ----------
+STAFF_PHOTO_BUCKET = "staff-photos"   # private bucket: {org_id}/{staff_id}/{n}.jpg
+STAFF_PHOTO_DIR = "staff_photos"      # local copy of the staff face photos (git-ignored)

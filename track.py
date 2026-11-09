@@ -7,6 +7,7 @@ Results: output/<video name>/rfdetr.mp4, rfdetr.csv, floor_map.png. Settings: tr
 import argparse
 
 from tracking.detection import MODELS
+from tracking.db import sync
 from tracking.pipeline import run
 
 
@@ -17,7 +18,10 @@ def main():
     ap.add_argument("--conf", type=float, default=0.25, help="minimum detection confidence")
     ap.add_argument("--show", action="store_true", help="show the video and the floor map live (q to quit)")
     ap.add_argument("--max-frames", type=int, default=0, help="stop after N frames (0 = whole video)")
+    ap.add_argument("--no-sync", action="store_true", help="don't refresh the staff photos from Supabase at start")
     args = ap.parse_args()
+    if not args.no_sync:
+        sync()
     run(args.video, size=args.size, conf=args.conf, show=args.show, max_frames=args.max_frames)
 
 
