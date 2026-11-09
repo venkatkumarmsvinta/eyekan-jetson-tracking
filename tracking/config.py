@@ -61,3 +61,8 @@ CAMERA_GROUPS = {
 # ---------- database (Supabase, see tracking/db.py) ----------
 STAFF_PHOTO_BUCKET = "staff-photos"   # private bucket: {org_id}/{staff_id}/{n}.jpg
 STAFF_PHOTO_DIR = Path(__file__).resolve().parent.parent / "photo"  # <project>/photo: local copy of the staff face photos (git-ignored)
+
+# ---------- face embeddings (InsightFace, see tracking/faces.py) ----------
+FACE_MODEL = "buffalo_l"     # SCRFD detector + ArcFace R50; weights are non-commercial only
+FACE_DET_SIZE = 320          # photos are scaled so the longer side is this many pixels before face detection
+STAFF_EMBED_FILE = STAFF_PHOTO_DIR / "embeddings.json"  # embeddings of the staff photos, next to them

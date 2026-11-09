@@ -14,7 +14,7 @@ from pathlib import Path
 import httpx
 from dotenv import load_dotenv
 
-from .config import STAFF_PHOTO_BUCKET, STAFF_PHOTO_DIR
+from .config import FACE_MODEL, STAFF_EMBED_FILE, STAFF_PHOTO_BUCKET, STAFF_PHOTO_DIR
 
 load_dotenv()  # reads .env from the current folder; variables already set in the shell win
 
@@ -28,12 +28,15 @@ class Supabase:
             raise SystemExit("Set {} in .env (copy .env.example)".format(e.args[0]))
         self.email = os.environ.get("EDGE_ACCOUNT_EMAIL")      # optional for now
         self.password = os.environ.get("EDGE_ACCOUNT_PASSWORD")
+        self.secret = os.environ.get("SUPABASE_SECRET_KEY")    # admin key: only on this Mac, never on a Jetson
         self.device = os.environ.get("DEVICE_NAME") or socket.gethostname()  # which Jetson wrote the log
         self.http = httpx.Client(base_url=self.url, timeout=10)
         self.token, self.expires = None, 0.0
 
     def headers(self):
         if not (self.email and self.password):  # anonymous: the publishable key only
+            if self.secret:  # no device account: the admin key (skips row-level security)
+                return {"apikey": self.secret}
             return {"apikey": self.key, "Authorization": "Bearer " + self.key}
         if time.time() > self.expires - 60:  # sign in (again) as the device account
             r = self.http.post("/auth/v1/token", params={"grant_type": "password"}, headers={"apikey": self.key},
@@ -120,22 +123,37 @@ class Supabase:
             print("Sync log not written ({})".format(detail))
 
 
+def sync_embeddings(db):
+    """Embed new and changed staff photos on this device and log it as sync_type 'embedding'."""
+    try:
+        from .faces import embed_photos
+        added, updated, removed, no_face = embed_photos()
+        print("Face embeddings: {} new, {} updated, {} removed, {} photos without a face -> {}".format(
+            added, updated, removed, no_face, STAFF_EMBED_FILE))
+        db.log("embedding", "ok", added=added, updated=updated, removed=removed,
+               message="{} photos without a face ({})".format(no_face, FACE_MODEL))
+    except Exception as e:  # model missing or broken: the photos are synced anyway, so don't stop the tracker
+        print("Face embeddings failed ({})".format(e))
+        db.log("embedding", "failed", message=str(e)[:500])
+
+
 def sync():
     """Refresh the local staff photos from Supabase. Called at tracker start and by the daily cron job."""
     db = None
     try:
         db = Supabase()
-        if not db.email:
-            print("Staff sync skipped: no EDGE_ACCOUNT_EMAIL in .env (anonymous sees no staff)")
+        if not (db.email or db.secret):
+            print("Staff sync skipped: no EDGE_ACCOUNT_EMAIL or SUPABASE_SECRET_KEY in .env (anonymous sees no staff)")
             return
         staff = db.staff()
         added, updated, removed = db.sync_photos(staff)
         print("Staff sync: {} staff, {} new, {} updated, {} removed -> {}".format(
             len(staff), added, updated, removed, STAFF_PHOTO_DIR))
         db.log("photo", "ok", added=added, updated=updated, removed=removed, message="{} staff".format(len(staff)))
+        sync_embeddings(db)
     except (httpx.HTTPError, SystemExit) as e:
         print("Staff sync failed ({}): using the photos already on this device".format(e))
-        if db and db.email:
+        if db and (db.email or db.secret):
             db.log("photo", "failed", message=str(e)[:500])
 
 

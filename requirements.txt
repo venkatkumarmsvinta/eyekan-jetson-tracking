@@ -11,3 +11,5 @@ opencv-python==5.0.0.93
 gdown==5.2.2           # boxmot downloads the re-ID weights with it
 httpx==0.28.1          # Supabase REST (staff list + photos)
 python-dotenv==1.0.1   # reads .env (Supabase credentials)
+insightface==1.0.1     # face detection + ArcFace embeddings (buffalo_l weights: non-commercial only)
+onnxruntime==1.19.2    # runs the face models (Jetson: install onnxruntime-gpu from the Jetson wheels instead)
