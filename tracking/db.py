@@ -28,6 +28,7 @@ class Supabase:
             raise SystemExit("Set {} in .env (copy .env.example)".format(e.args[0]))
         self.email = os.environ.get("EDGE_ACCOUNT_EMAIL")      # optional for now
         self.password = os.environ.get("EDGE_ACCOUNT_PASSWORD")
+        self.device = os.environ.get("DEVICE_NAME") or socket.gethostname()  # which Jetson wrote the log
         self.http = httpx.Client(base_url=self.url, timeout=10)
         self.token, self.expires = None, 0.0
 
@@ -111,7 +112,7 @@ class Supabase:
         log write only prints a warning, so it never hides the result of the sync itself."""
         try:
             r = self.http.post("/rest/v1/sync_log", headers={**self.headers(), "Prefer": "return=minimal"},
-                               json={"device": socket.gethostname(), "sync_type": sync_type, "status": status,
+                               json={"device": self.device, "sync_type": sync_type, "status": status,
                                      "added": added, "updated": updated, "removed": removed, "message": message})
             r.raise_for_status()
         except (httpx.HTTPError, SystemExit) as e:

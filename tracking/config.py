@@ -1,4 +1,5 @@
 """All settings in one place. Change values here, not in the other modules."""
+from pathlib import Path
 
 # ---------- models ----------
 POSE_MODEL = "usyd-community/vitpose-base-simple"  # ViTPose-B, COCO 17 keypoints, downloaded on first use
@@ -59,4 +60,4 @@ CAMERA_GROUPS = {
 
 # ---------- database (Supabase, see tracking/db.py) ----------
 STAFF_PHOTO_BUCKET = "staff-photos"   # private bucket: {org_id}/{staff_id}/{n}.jpg
-STAFF_PHOTO_DIR = "staff_photos"      # local copy of the staff face photos (git-ignored)
+STAFF_PHOTO_DIR = Path(__file__).resolve().parent.parent / "photo"  # <project>/photo: local copy of the staff face photos (git-ignored)

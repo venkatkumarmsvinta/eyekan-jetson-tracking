@@ -21,7 +21,7 @@ calibration/
 .DS_Store
 
 # staff face photos downloaded from Supabase
-staff_photos/
+photo/
 
 # secrets (Supabase sign-in)
 .env

@@ -149,7 +149,7 @@ Without it, floor positions are in image pixels. With it, in metres.
 
 ### Staff photos (Supabase)
 
-Credentials in `.env` (copy `.env.example`). `track.py` refreshes `staff_photos/` at start (`--no-sync` to skip):
+Credentials in `.env` (copy `.env.example`). `track.py` refreshes `photo/` at start (`--no-sync` to skip):
 only new photos are downloaded; photos of people no longer active or without consent are removed.
 Daily refresh at 06:00 on the Jetson (`crontab -e`):
 ```
