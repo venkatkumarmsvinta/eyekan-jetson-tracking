@@ -63,53 +63,53 @@ recognition, and have reference photos in Supabase; customers are unknown and mu
 └──────────▲─────────────────────────────┬──────────────────────────┘
            │ upload (admin, secret key)  │ read (device account)
 ┌──────────┴────────────┐     ┌──────────▼───────────────────────────────────────────┐
-│ tools/                │     │ Edge device                                          │
-│ upload_staff_photos.py│     │  tracking/db.py     sync: staff list, photos, log    │
+│ tools/                │     │ Edge device (modules in tracking/)                   │
+│ upload_staff_photos.py│     │  cloud/db.py        sync: staff list, photos, log    │
 └───────────────────────┘     │       │                                              │
                               │       ▼                                              │
-                              │  photo/<emp_id>/*.jpg, photo/.versions.json          │
+                              │  data/photos/<emp_id>/*.jpg, .versions.json          │
                               │       │                                              │
-                              │  tracking/faces.py  embeddings → photo/embeddings.json│
+                              │  staff/faces.py     embeddings → embeddings.json     │
                               │       │                                              │
-                              │  tracking/identify.py  StaffMatcher                  │
+                              │  staff/identify.py  StaffMatcher                     │
                               │       ▲ frames, boxes, keypoints, track IDs          │
-                              │  tracking/pipeline.py  detection → pose → tracking   │
+                              │  pipeline.py        detection → pose → tracking      │
                               │       │                                              │
-                              │       ▼ output/<video>/rfdetr.mp4, rfdetr.csv        │
+                              │       ▼ data/output/<video>/rfdetr.mp4, rfdetr.csv   │
                               └──────────────────────────────────────────────────────┘
 ```
 
 Two phases:
 
-1. **Sync phase** (`python -m tracking.db`; at tracker start and daily by cron): staff list → photos →
+1. **Sync phase** (`python -m tracking.cloud.db`; at tracker start and daily by cron): staff list → photos →
    embeddings → `sync_log`.
 2. **Tracking phase** (`python track.py <video>`): per frame, `StaffMatcher` collects face embeddings per track
    and labels each track.
 
 ## 5. Components
 
-### 5.1 Sync: `tracking/db.py`
+### 5.1 Sync: `tracking/cloud/db.py`
 
 | Function | Responsibility |
 |---|---|
 | `Supabase.headers()` | Authentication. Device account (email/password → JWT, renewed 60 s before expiry); if none is configured and `SUPABASE_SECRET_KEY` is set, the secret key (admin machine only); otherwise anonymous (sees no staff). |
 | `Supabase.staff()` | `GET /rest/v1/staff_current?active=eq.true&consent=eq.true` → id, emp_id, names, photo_paths. |
 | `Supabase.remote_versions(folder)` | `POST /storage/v1/object/list/staff-photos` → `{storage path: updated_at}` per staff folder. |
-| `Supabase.sync_photos(staff)` | Downloads new/changed photos, deletes removed ones, maintains `photo/.versions.json`. Returns (added, updated, removed). |
+| `Supabase.sync_photos(staff)` | Downloads new/changed photos, deletes removed ones, maintains `data/photos/.versions.json`. Returns (added, updated, removed). |
 | `Supabase.log(...)` | Inserts one `sync_log` row. Best effort: a failure prints a warning and never hides the sync result. |
 | `sync()` | Orchestrates: staff → photos → log → `sync_embeddings()`. Network and auth errors are caught; the device keeps its existing photos. |
 | `sync_embeddings(db)` | Calls `faces.embed_photos()`, logs `sync_type = 'embedding'`. Any exception is caught (N2). |
 
-### 5.2 Embedding: `tracking/faces.py`
+### 5.2 Embedding: `tracking/staff/faces.py`
 
 - `FaceEmbedder`: wraps InsightFace `FaceAnalysis` with only the `detection` (SCRFD) and `recognition`
   (ArcFace R50) modules of the `buffalo_l` pack. ONNX Runtime providers: CUDA if available, else CPU.
   Input is scaled so its longer side is `FACE_DET_SIZE`; returns the 512-d, L2-normalised embedding of the most
   confident face and its detector score.
-- `embed_photos()`: keeps `photo/embeddings.json` in step with `photo/*/*.jpg` (§7.3). The model is loaded
+- `embed_photos()`: keeps `data/photos/embeddings.json` in step with `data/photos/*/*.jpg` (§7.3). The model is loaded
   lazily, only if at least one photo needs embedding.
 
-### 5.3 Matching: `tracking/identify.py`
+### 5.3 Matching: `tracking/staff/identify.py`
 
 - `load_gallery()`: per `emp_id`, the mean of that person's photo embeddings, re-normalised (one centroid per
   staff member). Photos without a detected face are skipped.
@@ -117,7 +117,7 @@ Two phases:
 - `StaffMatcher.label(tid)`: the decision rule (§7.5). Returns `(emp_id, score)` or `(None, best score)`.
 - If no gallery exists, the face model is not loaded and every call is a no-op.
 
-### 5.4 Pipeline integration: `tracking/pipeline.py`, `tracking/drawing.py`
+### 5.4 Pipeline integration: `tracking/pipeline.py`, `tracking/render/drawing.py`
 
 - `StaffMatcher(fps)` is created next to `ReLink`.
 - Per frame, after `ReLink` assigns final IDs and **before any drawing** (the frame must be clean), `update()`
@@ -172,17 +172,17 @@ ended first) and the aggregated photos:
 Private bucket `staff-photos`, object path `{org_id}/{staff_id}/{n}.jpg`. Read: org members; write: admins
 (storage policies). The object's `updated_at` changes on re-upload and drives change detection.
 
-### 6.5 Local files (on each device; `photo/` is git-ignored)
+### 6.5 Local files (on each device; `data/` is git-ignored)
 
 | File | Content |
 |---|---|
-| `photo/<emp_id>/<n>.jpg` | Local copies; folder per `emp_id`, file name from the storage path. |
-| `photo/.versions.json` | `{"<emp_id>/<file>": "<storage updated_at>"}`: the version of each local copy. |
-| `photo/embeddings.json` | `{"model": "buffalo_l", "photos": {"<emp_id>/<file>": {"stamp": "<mtime_ns>-<size>", "score": <detector score>, "embedding": [512 floats] or null}}}` |
+| `data/photos/<emp_id>/<n>.jpg` | Local copies; folder per `emp_id`, file name from the storage path. |
+| `data/photos/.versions.json` | `{"<emp_id>/<file>": "<storage updated_at>"}`: the version of each local copy. |
+| `data/photos/embeddings.json` | `{"model": "buffalo_l", "photos": {"<emp_id>/<file>": {"stamp": "<mtime_ns>-<size>", "score": <detector score>, "embedding": [512 floats] or null}}}` |
 
 ### 6.6 Tracker CSV
 
-`output/<video>/rfdetr.csv` gains two columns at the end: `staff` (`emp_id` or empty) and `staff_score` (best
+`data/output/<video>/rfdetr.csv` gains two columns at the end: `staff` (`emp_id` or empty) and `staff_score` (best
 cosine similarity of the track so far, 3 decimals). The label of a track can change while faces are collected.
 
 ## 7. Algorithms
@@ -238,8 +238,8 @@ The margin condition prevents a label when two staff members are similarly close
 | Parameter | Value | Purpose |
 |---|---|---|
 | `STAFF_PHOTO_BUCKET` | `staff-photos` | Storage bucket |
-| `STAFF_PHOTO_DIR` | `<project>/photo` | Local photo folder (resolved from the package, independent of the working directory) |
-| `STAFF_EMBED_FILE` | `<project>/photo/embeddings.json` | Local embeddings |
+| `STAFF_PHOTO_DIR` | `DATA_DIR/photos` (`DATA_DIR` = `<project>/data` or `$EYEKAN_DATA_DIR`) | Local photo folder (independent of the working directory) |
+| `STAFF_EMBED_FILE` | `DATA_DIR/photos/embeddings.json` | Local embeddings |
 | `FACE_MODEL` | `buffalo_l` | InsightFace model pack |
 | `FACE_DET_SIZE` | 320 | Detector input size (px, longer side) |
 | `FACE_EVERY_S` | 0.33 | Minimum interval between face attempts per track (s) |
@@ -256,7 +256,7 @@ Environment (`.env`): `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `EDGE_ACCOUNT_
 
 | Command | Effect |
 |---|---|
-| `python -m tracking.db` | Sync staff photos and embeddings; writes 2 `sync_log` rows |
+| `python -m tracking.cloud.db` | Sync staff photos and embeddings; writes 2 `sync_log` rows |
 | `python track.py <video> [--no-sync] [--max-frames N] [--show]` | Sync (unless `--no-sync`), then track with staff matching |
 | `python tools/upload_staff_photos.py <emp_id> <jpg...> [--consent]` | Admin: add staff photos |
 
@@ -271,8 +271,8 @@ Use the `venv-rfdetr` interpreter (`venv-rfdetr/bin/python`).
   deactivating removes the person's photos and embeddings from every device at the next sync (daily cron).
 - **Customers:** customer face embeddings exist only in memory for the duration of a run and are never written
   to disk or the database. Note: the output video and CSV still contain all tracked people.
-- **Local copies:** the development project is inside OneDrive, so `photo/` is synced to OneDrive.
-  `.gitignore` does not prevent this.
+- **Local copies:** the development project is inside OneDrive, so `data/photos/` is synced to OneDrive
+  unless `EYEKAN_DATA_DIR` points outside it. `.gitignore` does not prevent this.
 - **Compliance:** a DPIA is expected to be required for biometric identification of staff.
 
 ## 11. Error handling
@@ -355,7 +355,8 @@ threshold of 0.25, so the margin is thin. Two labels were based on a single face
 | 2026-11-09 | `cab5be7` | Upload tool; SQL: `sync_log`, `staff_code`, consent/gender on `staff_employment`, view |
 | 2026-11-09 | `0aad4f3` | Device name in `sync_log`; photos in `photo/` |
 | 2026-11-09 | `a4f6864` | Embeddings with `buffalo_l` after sync; secret-key fallback |
-| 2026-11-10 | (this commit) | Track-level staff matching (`tracking/identify.py`); this document |
+| 2026-11-10 | `fe53b87` | Track-level staff matching (`tracking/identify.py`); this document |
+| 2026-11-10 | (this commit) | Folder structure: `tracking/` subpackages, all runtime data under `data/` (`EYEKAN_DATA_DIR`) |
 
 ## Appendix A: database migrations
 

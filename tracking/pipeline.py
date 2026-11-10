@@ -6,23 +6,24 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-from .config import ANKLES, CSV_COLUMNS, FACE_POINTS, HOLD_S, POSTER_ZONES, REID_WEIGHTS, REMEMBER_S, TORSO_POINTS
-from .detection import MODELS, PERSON, drop_duplicates, on_poster, overlaps_other
-from .drawing import draw_person
-from .floor import Floor, FloorMap
-from .identify import StaffMatcher
-from .keypoints import face_info, mean_point, person_crop, torso_colour, torso_visible
-from .pose import Pose
-from .relink import ReLink, apply_handovers
-from .tracker import load_reid, make_tracker
+from .config import (ANKLES, CSV_COLUMNS, FACE_POINTS, HOLD_S, OUTPUT_DIR, POSTER_ZONES, REID_WEIGHTS, REMEMBER_S,
+                     TORSO_POINTS)
+from .geometry.floor import Floor, FloorMap
+from .identity.relink import ReLink, apply_handovers
+from .identity.tracker import load_reid, make_tracker
+from .render.drawing import draw_person
+from .staff.identify import StaffMatcher
+from .vision.detection import PERSON, drop_duplicates, load_detector, on_poster, overlaps_other
+from .vision.keypoints import face_info, mean_point, person_crop, torso_colour, torso_visible
+from .vision.pose import Pose
 
 
 def run(video, size="nano", conf=0.25, show=False, max_frames=0):
-    """Track the people in `video`. Results go to output/<video name>/ (rfdetr.mp4, rfdetr.csv, floor_map.png)."""
+    """Track the people in `video`. Results go to OUTPUT_DIR/<video name>/ (rfdetr.mp4, rfdetr.csv, floor_map.png)."""
     video_path = Path(video)
     if not video_path.exists():
         raise SystemExit("Video not found: {}".format(video_path))
-    out_dir = Path("output") / video_path.stem
+    out_dir = OUTPUT_DIR / video_path.stem
     out_dir.mkdir(parents=True, exist_ok=True)
 
     cap = cv2.VideoCapture(str(video_path))
@@ -36,7 +37,7 @@ def run(video, size="nano", conf=0.25, show=False, max_frames=0):
     poster_zones = POSTER_ZONES.get(video_path.stem, [])
     floor = Floor(video_path.stem)
     floor_map = FloorMap(floor.unit)
-    model = MODELS[size]()  # downloads the COCO-trained weights on first use
+    model = load_detector(size)  # downloads the COCO-trained weights on first use
     pose = Pose(device)
     tracker = make_tracker(fps, device)
     relink = ReLink(fps, load_reid(device))

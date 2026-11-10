@@ -4,27 +4,18 @@ venv-rfdetr/
 __pycache__/
 *.pyc
 
-# store CCTV footage and results: people's faces, never on GitHub
-videos/
-output/
-*.mp4
+# all runtime data: CCTV videos and results (people's faces), staff photos, calibrations,
+# model weights, logs. Never on GitHub. Location: tracking/config.py DATA_DIR (EYEKAN_DATA_DIR).
+data/
 
-# model weights (downloaded automatically; GitHub limit is 100 MB)
+# in case data ends up elsewhere in the repo
+*.mp4
 *.pth
 *.pt
 *.onnx
 *.engine
 
-# per-camera floor calibration (site specific)
-calibration/
-
-.DS_Store
-
-# staff face photos downloaded from Supabase
-photo/
-
 # secrets (Supabase sign-in)
 .env
 
-# staff photo sync log (cron)
-logs/
+.DS_Store

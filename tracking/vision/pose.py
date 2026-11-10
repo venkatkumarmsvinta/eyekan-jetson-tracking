@@ -1,7 +1,7 @@
 """ViTPose (Hugging Face transformers): 17 COCO keypoints per person box."""
 import numpy as np
 
-from .config import POSE_MODEL
+from ..config import POSE_MODEL
 
 
 class Pose:

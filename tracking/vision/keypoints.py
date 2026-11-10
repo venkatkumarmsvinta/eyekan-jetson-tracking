@@ -2,7 +2,7 @@
 import cv2
 import numpy as np
 
-from .config import (CROP_H, CROP_W, FACE_POINTS, L_EAR, L_EYE, L_SHOULDER, NOSE, R_EAR, R_EYE, R_SHOULDER,
+from ..config import (CROP_H, CROP_W, FACE_POINTS, L_EAR, L_EYE, L_SHOULDER, NOSE, R_EAR, R_EYE, R_SHOULDER,
                      SEEN, TORSO_POINTS)
 
 

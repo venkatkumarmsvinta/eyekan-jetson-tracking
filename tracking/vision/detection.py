@@ -1,12 +1,24 @@
 """Person detection with RF-DETR and box clean-up (posters, duplicate boxes)."""
 import numpy as np
 from rfdetr import RFDETRBase, RFDETRLarge, RFDETRMedium, RFDETRNano, RFDETRSmall
+from rfdetr.main import HOSTED_MODELS
 from rfdetr.util.coco_classes import COCO_CLASSES
+from rfdetr.util.files import download_file
 
-from .config import SEEN, UPPER_POINTS
+from ..config import MODEL_DIR, SEEN, UPPER_POINTS
 
 MODELS = {"nano": RFDETRNano, "small": RFDETRSmall, "medium": RFDETRMedium, "base": RFDETRBase, "large": RFDETRLarge}
 PERSON = next(k for k, v in COCO_CLASSES.items() if v == "person")  # RF-DETR uses COCO category ids
+
+
+def load_detector(size):
+    """RF-DETR with its COCO weights in MODEL_DIR (downloaded there on first use).
+    rfdetr itself only downloads to the current folder, so the download is done here."""
+    weights = MODEL_DIR / "rf-detr-{}.pth".format(size)
+    if not weights.exists():
+        weights.parent.mkdir(parents=True, exist_ok=True)
+        download_file(HOSTED_MODELS[weights.name], str(weights))
+    return MODELS[size](pretrain_weights=str(weights))
 
 
 def on_poster(box, zones, overlap=0.6):

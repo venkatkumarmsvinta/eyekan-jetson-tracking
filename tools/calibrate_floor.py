@@ -3,22 +3,26 @@
 1. Print a chessboard and lay it FLAT on the floor where the camera can see it (bigger board = better).
 2. Record a short video or take a frame with the camera (it must not move afterwards).
 3. Run:
-       python calibrate_floor.py videos/camera1_chessboard.mp4 --name camera1 --cols 9 --rows 6 --square 0.10
+       python tools/calibrate_floor.py data/videos/camera1_chessboard.mp4 --name camera1 --cols 9 --rows 6 --square 0.10
    --cols / --rows = number of INNER corners (where 4 squares meet), not squares.
    A board with 10 x 7 squares has 9 x 6 inner corners. --square = side of one square in metres.
-4. Check calibration/<name>_check.jpg: the drawn 0.5 m floor grid must lie flat on the floor.
+4. Check data/calibration/<name>_check.jpg: the drawn 0.5 m floor grid must lie flat on the floor.
 
 Floor coordinates: (0, 0) is the first detected corner (marked on the check image); x runs along the board's
 rows, y along its columns, in metres. Use --origin-x / --origin-y to shift it (e.g. to a corner of the store).
 
-Saves calibration/<name>.json, which detect_rfdetr.py loads for the video with the same name.
+Saves data/calibration/<name>.json, which track.py loads for the video with the same name.
 """
 import argparse
 import json
+import sys
 from pathlib import Path
 
 import cv2
 import numpy as np
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from tracking.config import CALIB_DIR  # noqa: E402
 
 
 def read_frame(source, frame_no):
@@ -110,8 +114,8 @@ def main():
     H, _ = cv2.findHomography(corners.astype(np.float64), floor)
     err = np.linalg.norm(to_floor(H, corners) - floor, axis=1)
 
-    out_dir = Path("calibration")
-    out_dir.mkdir(exist_ok=True)
+    out_dir = CALIB_DIR
+    out_dir.mkdir(parents=True, exist_ok=True)
     calib = {
         "camera": name,
         "image_size": [img.shape[1], img.shape[0]],

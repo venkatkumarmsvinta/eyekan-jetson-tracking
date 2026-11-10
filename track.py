@@ -1,13 +1,13 @@
 """Track the people in a store CCTV video.
 
-    python track.py videos/camera1.mp4 --show
+    python track.py data/videos/camera1.mp4 --show
 
-Results: output/<video name>/rfdetr.mp4, rfdetr.csv, floor_map.png. Settings: tracking/config.py.
+Results: data/output/<video name>/rfdetr.mp4, rfdetr.csv, floor_map.png. Settings: tracking/config.py.
 """
 import argparse
 
-from tracking.detection import MODELS
-from tracking.db import sync
+from tracking.cloud.db import sync
+from tracking.vision.detection import MODELS
 from tracking.pipeline import run
 
 

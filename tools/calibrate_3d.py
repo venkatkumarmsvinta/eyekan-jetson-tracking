@@ -2,18 +2,18 @@
 
 1. Measure points in the store, all from ONE origin (0, 0) on the floor; x and y along the floor, z = height,
    in metres. At least 6 per camera, at least 2 not on the floor (counter top, poster corners, sign tops).
-   Write them in calibration/store_points.csv (one file for all cameras):
+   Write them in data/calibration/store_points.csv (one file for all cameras):
        name,x,y,z
        A1_counter_top_near_trial_room,2.10,3.40,0.95
        E1_floor_tile_corner,4.00,1.20,0
 2. Click the points each camera can see (a zoom window helps to click exactly):
        python tools/calibrate_3d.py click camera1 --frame 3375
    left click = place the asked point, n = skip it (not visible), u = undo, q = save and quit.
-   Saved in calibration/camera1_clicks.csv; run again to add points (already clicked ones are kept).
+   Saved in data/calibration/camera1_clicks.csv; run again to add points (already clicked ones are kept).
 3. Compute the camera:
        python tools/calibrate_3d.py solve camera1 --frame 3375
-   Prints the error per point, saves calibration/camera1.json (3x4 matrix, lens, camera position, floor
-   homography for track.py) and calibration/camera1_check.jpg (0.5 m floor grid + 1.7 m posts: the grid must
+   Prints the error per point, saves data/calibration/camera1.json (3x4 matrix, lens, camera position, floor
+   homography for track.py) and data/calibration/camera1_check.jpg (0.5 m floor grid + 1.7 m posts: the grid must
    lie flat on the floor and the posts must look as tall as a person).
    Add --distortion for wide-angle cameras with bent straight lines (needs 8+ points).
 """
@@ -26,9 +26,8 @@ import cv2
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from tracking.camera import Camera  # noqa: E402
-
-CALIB_DIR = Path("calibration")
+from tracking.config import CALIB_DIR, VIDEO_DIR  # noqa: E402
+from tracking.geometry.camera import Camera  # noqa: E402
 
 
 # ---------- files ----------
@@ -57,12 +56,12 @@ def write_clicks(path, clicks):
 
 
 def read_frame(camera, frame_no):
-    cap = cv2.VideoCapture(str(Path("videos") / "{}.mp4".format(camera)))
+    cap = cv2.VideoCapture(str(VIDEO_DIR / "{}.mp4".format(camera)))
     cap.set(cv2.CAP_PROP_POS_FRAMES, frame_no)
     ok, img = cap.read()
     cap.release()
     if not ok:
-        raise SystemExit("Could not read frame {} of videos/{}.mp4".format(frame_no, camera))
+        raise SystemExit("Could not read frame {} of {}/{}.mp4".format(frame_no, VIDEO_DIR, camera))
     return img
 
 
@@ -218,7 +217,7 @@ def solve(camera, frame_no, points_path, distortion=False):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("action", choices=["click", "solve"])
-    ap.add_argument("camera", help="video name in videos/, e.g. camera1")
+    ap.add_argument("camera", help="video name in data/videos/, e.g. camera1")
     ap.add_argument("--frame", type=int, default=0, help="frame to click on / draw the check on (pick an empty scene)")
     ap.add_argument("--points", default=str(CALIB_DIR / "store_points.csv"), help="measured points (name,x,y,z)")
     ap.add_argument("--redo", action="store_true", help="click: start again, forget earlier clicks")

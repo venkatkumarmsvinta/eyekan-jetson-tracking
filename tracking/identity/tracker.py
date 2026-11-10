@@ -1,7 +1,7 @@
 """BoT-SORT tracker and the OSNet re-ID model (both from boxmot)."""
 from pathlib import Path
 
-from .config import HOLD_S, REID_WEIGHTS
+from ..config import HOLD_S, REID_WEIGHTS
 
 
 def make_tracker(fps, device):

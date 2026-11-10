@@ -3,7 +3,7 @@
 Credentials come from .env in the repository folder (copy .env.example). SUPABASE_URL and
 SUPABASE_PUBLISHABLE_KEY are required. Without EDGE_ACCOUNT_EMAIL/PASSWORD the calls are anonymous:
 the connection works, but row-level security returns no staff.
-Check the connection:  python -m tracking.db
+Check the connection:  python -m tracking.cloud.db
 """
 import json
 import os
@@ -14,9 +14,9 @@ from pathlib import Path
 import httpx
 from dotenv import load_dotenv
 
-from .config import FACE_MODEL, STAFF_EMBED_FILE, STAFF_PHOTO_BUCKET, STAFF_PHOTO_DIR
+from ..config import FACE_MODEL, ROOT, STAFF_EMBED_FILE, STAFF_PHOTO_BUCKET, STAFF_PHOTO_DIR
 
-load_dotenv()  # reads .env from the current folder; variables already set in the shell win
+load_dotenv(ROOT / ".env")  # the repository's .env, from any folder; variables already set in the shell win
 
 
 class Supabase:
@@ -126,7 +126,7 @@ class Supabase:
 def sync_embeddings(db):
     """Embed new and changed staff photos on this device and log it as sync_type 'embedding'."""
     try:
-        from .faces import embed_photos
+        from ..staff.faces import embed_photos
         added, updated, removed, no_face = embed_photos()
         print("Face embeddings: {} new, {} updated, {} removed, {} photos without a face -> {}".format(
             added, updated, removed, no_face, STAFF_EMBED_FILE))
@@ -158,4 +158,4 @@ def sync():
 
 
 if __name__ == "__main__":
-    sync()  # python -m tracking.db  (by hand, or daily from cron)
+    sync()  # python -m tracking.cloud.db  (by hand, or daily from cron)

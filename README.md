@@ -53,25 +53,56 @@ on purpose, a new ID is safer than a wrong one.
 
 ```
 track.py                 entry point: python track.py <video>
-calibrate_floor.py       one-time floor calibration per camera (chessboard -> metres)
 requirements.txt
-tools/
-├── sync_clocks.py       frame offset between two recordings from the burned-in clock
-└── calibrate_3d.py      3D camera calibration from measured store points (multi-camera)
-tracking/
-├── camera.py            calibrated camera: store metres <-> pixels (head/feet -> floor position)
-├── config.py            ALL settings (thresholds, poster zones, model names, CSV columns)
+.env.example             Supabase settings (copy to .env)
+tracking/                the Python package, one subfolder per job
+├── config.py            ALL settings and ALL paths (thresholds, poster zones, model names, CSV columns, DATA_DIR)
 ├── pipeline.py          the per-frame loop: detect → pose → track → ReLink → outputs
-├── detection.py         RF-DETR models, poster filter, duplicate-box removal
-├── pose.py              ViTPose keypoints
-├── keypoints.py         facing, torso colour, crop for the re-ID model
-├── tracker.py           BoT-SORT tracker + OSNet re-ID model loader
-├── relink.py            ReLink (keeps IDs) + CSV/floor-map correction after renames
-├── floor.py             pixel → floor position, floor map image
-└── drawing.py           drawing a person on the output video
+├── vision/              what is in the frame
+│   ├── detection.py     RF-DETR models (weights in data/models), poster filter, duplicate-box removal
+│   ├── pose.py          ViTPose keypoints
+│   └── keypoints.py     facing, torso colour, crop for the re-ID model
+├── identity/            keeping the same ID per person
+│   ├── tracker.py       BoT-SORT tracker + OSNet re-ID model loader
+│   └── relink.py        ReLink (keeps IDs) + CSV/floor-map correction after renames
+├── geometry/            pixels <-> store metres
+│   ├── camera.py        calibrated camera: store metres <-> pixels (head/feet -> floor position)
+│   └── floor.py         pixel → floor position, floor map image
+├── staff/               staff recognition by face
+│   ├── faces.py         buffalo_l face model, staff photo embeddings
+│   └── identify.py      match tracks to staff by face
+├── cloud/               Supabase
+│   └── db.py            staff list, photo sync, sync_log
+└── render/
+    └── drawing.py       drawing a person on the output video
+tools/                   one-off command-line scripts
+├── calibrate_floor.py   one-time floor calibration per camera (chessboard -> metres)
+├── calibrate_3d.py      3D camera calibration from measured store points (multi-camera)
+├── sync_clocks.py       frame offset between two recordings from the burned-in clock
+└── upload_staff_photos.py  admin (Mac only): upload staff face photos to Supabase
+docs/                    design documents
+sql/                     Supabase schema changes, one dated file per change
+data/                    runtime data, git-ignored (see below)
+├── videos/              camera recordings: <camera>.mp4
+├── calibration/         <camera>.json, store_points.csv, check images
+├── photos/              staff face photos from Supabase + embeddings.json
+├── models/              RF-DETR weights (downloaded on first run)
+├── output/              results per video
+└── logs/                cron logs
 ```
 
-Not in git (see `.gitignore`): `videos/`, `output/`, model weights (`*.pth`, `*.pt`), `venv*/`, `calibration/`.
+Where new code goes: a new job gets its own folder in `tracking/` (planned: `multicam/` to join cameras,
+`sources/` for live camera streams), a new script goes in `tools/`, tests in `tests/`, Jetson service/cron
+files in `deploy/jetson/`. Create a folder when its first file is added.
+
+**Data location.** All paths are in `tracking/config.py`, so the code runs from any folder. `data/` is in the
+repository by default; set `EYEKAN_DATA_DIR` to keep it elsewhere, e.g. on the Jetson's SSD or outside
+OneDrive (staff photos and CCTV should not be synced to the cloud):
+```bash
+export EYEKAN_DATA_DIR=/mnt/ssd/eyekan
+```
+
+Not in git (see `.gitignore`): `data/`, `.env`, `venv*/`.
 
 ## Setup
 
@@ -84,7 +115,7 @@ python3 -m venv venv-rfdetr
 source venv-rfdetr/bin/activate
 pip install --upgrade pip
 pip install -r requirements.txt
-mkdir videos        # put the camera videos here, e.g. videos/camera1.mp4
+mkdir -p data/videos   # put the camera videos here, e.g. data/videos/camera1.mp4
 ```
 
 ### NVIDIA Jetson
@@ -110,7 +141,7 @@ set `REID_WEIGHTS = "osnet_x0_25_msmt17.pt"` in `tracking/config.py` (~2x faster
 
 | Model | Used for | Where it goes |
 |---|---|---|
-| RF-DETR nano (`rf-detr-nano.pth`, ~350 MB) | person boxes | current folder |
+| RF-DETR nano (`rf-detr-nano.pth`, ~350 MB) | person boxes | `data/models/` |
 | ViTPose-B (`usyd-community/vitpose-base-simple`) | keypoints | Hugging Face cache (`~/.cache/huggingface`) |
 | OSNet (`osnet_ain_x1_0_msmt17.pt`, 17 MB) | re-ID in ReLink | boxmot's `engine/weights/` folder inside the venv |
 
@@ -118,11 +149,9 @@ The first run needs internet; after that it works offline.
 
 ## Run
 
-Always run from the repository folder (outputs and calibrations are relative to it).
-
 ```bash
 source venv-rfdetr/bin/activate
-python track.py videos/camera1.mp4 --show
+python track.py data/videos/camera1.mp4 --show
 ```
 
 | Option | Default | Meaning |
@@ -131,6 +160,7 @@ python track.py videos/camera1.mp4 --show
 | `--conf` | `0.25` | minimum detection confidence |
 | `--show` | off | show the video and floor map live (`q` to quit) |
 | `--max-frames N` | `0` | stop after N frames (0 = whole video) |
+| `--no-sync` | off | don't refresh the staff photos from Supabase at start |
 
 Progress is printed every 100 frames: fps, boxes, IDs, re-linked, handed over, duplicates, re-ID crops.
 
@@ -141,19 +171,19 @@ Without it, floor positions are in image pixels. With it, in metres.
 1. Lay a printed chessboard flat on the floor where the camera sees it; record a short video.
 2. Run (cols/rows = **inner** corners, square = side of one square in metres):
    ```bash
-   python calibrate_floor.py videos/camera1_chessboard.mp4 --name camera1 --cols 9 --rows 6 --square 0.10
+   python tools/calibrate_floor.py data/videos/camera1_chessboard.mp4 --name camera1 --cols 9 --rows 6 --square 0.10
    ```
-3. Check `calibration/camera1_check.jpg`: the drawn 0.5 m grid must lie flat on the floor.
+3. Check `data/calibration/camera1_check.jpg`: the drawn 0.5 m grid must lie flat on the floor.
 
-`track.py` loads `calibration/<video name>.json` automatically for the video with the same name.
+`track.py` loads `data/calibration/<video name>.json` automatically for the video with the same name.
 
 ### Staff photos (Supabase)
 
-Credentials in `.env` (copy `.env.example`). `track.py` refreshes `photo/` at start (`--no-sync` to skip):
+Credentials in `.env` (copy `.env.example`). `track.py` refreshes `data/photos/` at start (`--no-sync` to skip):
 only new photos are downloaded; photos of people no longer active or without consent are removed.
 Daily refresh at 06:00 on the Jetson (`crontab -e`):
 ```
-0 6 * * *  cd /home/<user>/jetson-multi-tracking && venv-rfdetr/bin/python -m tracking.db >> logs/staff_sync.log 2>&1
+0 6 * * *  cd /home/<user>/jetson-multi-tracking && mkdir -p data/logs && venv-rfdetr/bin/python -m tracking.cloud.db >> data/logs/staff_sync.log 2>&1
 ```
 
 Technical design of staff recognition (architecture, data model, algorithms, evaluation): [docs/staff-recognition-technical-design.md](docs/staff-recognition-technical-design.md).
@@ -166,10 +196,10 @@ Two things are needed first: the videos in sync, and every camera calibrated in 
 ### 1. Sync the recordings (burned-in clock)
 
 ```bash
-python tools/sync_clocks.py videos/camera1.mp4 videos/camera6.mp4
-# read the two times on output/sync/*_first_tick.png, then:
-python tools/sync_clocks.py videos/camera1.mp4 videos/camera6.mp4 --times 04:01:46 04:00:52
-# -> RESULT: camera6 frame = camera1 frame +805 ; check output/sync/camera1_camera6_check.jpg
+python tools/sync_clocks.py data/videos/camera1.mp4 data/videos/camera6.mp4
+# read the two times on data/output/sync/*_first_tick.png, then:
+python tools/sync_clocks.py data/videos/camera1.mp4 data/videos/camera6.mp4 --times 04:01:46 04:00:52
+# -> RESULT: camera6 frame = camera1 frame +805 ; check data/output/sync/camera1_camera6_check.jpg
 ```
 
 Put the result in `CAMERA_GROUPS` in `tracking/config.py` (camera1 + camera6 is already there).
@@ -178,7 +208,7 @@ Put the result in `CAMERA_GROUPS` in `tracking/config.py` (camera1 + camera6 is 
 
 1. Pick one origin (0, 0) on the store floor (e.g. a wall corner). Measure points the cameras see, in metres:
    x and y along the floor, z = height. At least 6 per camera, at least 2 of them **not** on the floor
-   (counter top corners, poster corners, top of a sign). Write them in `calibration/store_points.csv`:
+   (counter top corners, poster corners, top of a sign). Write them in `data/calibration/store_points.csv`:
    ```
    name,x,y,z
    A1_counter_top_near_trial_room,2.10,3.40,0.95
@@ -196,11 +226,11 @@ Put the result in `CAMERA_GROUPS` in `tracking/config.py` (camera1 + camera6 is 
    python tools/calibrate_3d.py solve camera1 --frame 3375 --distortion
    python tools/calibrate_3d.py solve camera6 --frame 4180 --distortion
    ```
-   Check `calibration/<camera>_check.jpg`: the 0.5 m floor grid must lie flat on the floor and the red 1.7 m
+   Check `data/calibration/<camera>_check.jpg`: the 0.5 m floor grid must lie flat on the floor and the red 1.7 m
    posts must look as tall as a person. The JSON also contains a floor homography, so `track.py` gives floor
    positions in metres for these cameras too. Use `--distortion` with 8+ points.
 
-## Output (`output/<video name>/`)
+## Output (`data/output/<video name>/`)
 
 | File | Content |
 |---|---|
@@ -220,6 +250,7 @@ CSV columns:
 | `head_x`, `head_y` | head position in pixels (empty if not visible) |
 | `foot_x_px`, `foot_y_px`, `foot_from` | where the person stands, from `ankles` or the `box` bottom |
 | `floor_x`, `floor_y`, `floor_unit` | floor position, in `m` (calibrated) or `px` |
+| `staff`, `staff_score` | `emp_id` if the face matches a staff member (else empty), best similarity |
 
 ## Tuning (`tracking/config.py`)
 

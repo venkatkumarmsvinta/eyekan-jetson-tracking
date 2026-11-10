@@ -6,7 +6,7 @@ from pathlib import Path
 
 import cv2
 
-from .config import FACE_DET_SIZE, FACE_MODEL, STAFF_EMBED_FILE, STAFF_PHOTO_DIR
+from ..config import FACE_DET_SIZE, FACE_MODEL, STAFF_EMBED_FILE, STAFF_PHOTO_DIR
 
 
 class FaceEmbedder:

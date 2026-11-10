@@ -1,17 +1,18 @@
-"""Floor position: pixels -> metres with a calibration (calibrate_floor.py), and the top-down floor map."""
+"""Floor position: pixels -> metres with a calibration (tools/calibrate_floor.py), and the top-down floor map."""
 import json
 from collections import defaultdict
-from pathlib import Path
 
 import cv2
 import numpy as np
 
+from ..config import CALIB_DIR
+
 
 class Floor:
-    """Pixel -> floor position, in metres with a calibration (calibrate_floor.py), otherwise in pixels."""
+    """Pixel -> floor position, in metres with a calibration (tools/calibrate_floor.py), otherwise in pixels."""
 
     def __init__(self, name):
-        path = Path("calibration") / "{}.json".format(name)
+        path = CALIB_DIR / "{}.json".format(name)
         self.H = np.array(json.loads(path.read_text())["H_image_to_floor"]) if path.exists() else None
         self.unit = "m" if self.H is not None else "px"
         self.source = str(path) if self.H is not None else "none (positions in image pixels)"

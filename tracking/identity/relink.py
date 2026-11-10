@@ -5,8 +5,8 @@ import csv
 import cv2
 import numpy as np
 
-from . import config
-from .config import CROP_H, CROP_W
+from .. import config
+from ..config import CROP_H, CROP_W
 
 
 class ReLink:

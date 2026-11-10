@@ -1,5 +1,5 @@
 """Who is this person? Staff recognition by face: now and then the face of each track is embedded (buffalo_l),
-and the average of a track's faces is compared with the staff photo embeddings (photo/embeddings.json)."""
+and the average of a track's faces is compared with the staff photo embeddings (data/photos/embeddings.json)."""
 import json
 from collections import defaultdict
 from pathlib import Path
@@ -7,9 +7,9 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-from .config import (FACE_DET_SIZE, FACE_EVERY_S, FACE_MAX_PER_TRACK, FACE_MIN_BOX_H, FACE_MIN_CONF, FACE_POINTS,
+from ..config import (FACE_DET_SIZE, FACE_EVERY_S, FACE_MAX_PER_TRACK, FACE_MIN_BOX_H, FACE_MIN_CONF, FACE_POINTS,
                      STAFF_EMBED_FILE, STAFF_MARGIN, STAFF_THRESHOLD)
-from .keypoints import face_info, mean_point
+from ..vision.keypoints import face_info, mean_point
 
 
 def load_gallery():

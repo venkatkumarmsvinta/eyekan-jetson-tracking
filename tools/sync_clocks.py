@@ -1,19 +1,23 @@
 """Synchronise two recordings with the clock burned into the video (top right, white digits).
 
 Step 1 - find the clock ticks and save the clock at the first tick of each video:
-    python tools/sync_clocks.py videos/camera1.mp4 videos/camera6.mp4
+    python tools/sync_clocks.py data/videos/camera1.mp4 data/videos/camera6.mp4
 Step 2 - read the two times on the saved images and compute the frame offset:
-    python tools/sync_clocks.py videos/camera1.mp4 videos/camera6.mp4 --times 04:01:46 04:00:52
+    python tools/sync_clocks.py data/videos/camera1.mp4 data/videos/camera6.mp4 --times 04:01:46 04:00:52
 
 Result: "camera6 frame = camera1 frame + N". Put N in CAMERA_GROUPS in tracking/config.py.
 Only the seconds digits are watched, so fans or lights moving behind the clock are ignored.
-Images are saved in output/sync/.
+Images are saved in data/output/sync/.
 """
 import argparse
+import sys
 from pathlib import Path
 
 import cv2
 import numpy as np
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from tracking.config import OUTPUT_DIR  # noqa: E402
 
 SECONDS_BOX = (1715, 25, 1800, 80)  # x1, y1, x2, y2 of the seconds digits on a 1920x1080 frame
 CLOCK_BOX = (1150, 15, 1900, 80)    # the whole date/time, for the saved images
@@ -65,7 +69,7 @@ def main():
     ap.add_argument("video_b")
     ap.add_argument("--times", nargs=2, metavar=("TIME_A", "TIME_B"),
                     help="HH:MM:SS shown at the first tick of each video (read from the saved images)")
-    ap.add_argument("--out", default="output/sync", help="folder for the clock and check images")
+    ap.add_argument("--out", default=str(OUTPUT_DIR / "sync"), help="folder for the clock and check images")
     args = ap.parse_args()
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)

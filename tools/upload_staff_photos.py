@@ -20,7 +20,7 @@ def main():
     ap.add_argument("photos", nargs="+", help="JPEG files")
     ap.add_argument("--consent", action="store_true", help="also set consent = true (only if the person agreed)")
     args = ap.parse_args()
-    load_dotenv()
+    load_dotenv(Path(__file__).resolve().parents[1] / ".env")  # the repository's .env, from any folder
     db = httpx.Client(base_url=os.environ["SUPABASE_URL"].rstrip("/"), timeout=30,
                       headers={"apikey": os.environ["SUPABASE_SECRET_KEY"]})
 

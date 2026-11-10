@@ -1,8 +1,8 @@
 """Drawing a person on the output video: box, ID, skeleton, face info, floor position."""
 import cv2
 
-from .config import SEEN, SKELETON
-from .floor import id_color
+from ..config import SEEN, SKELETON
+from ..geometry.floor import id_color
 
 
 def draw_person(frame, box, tid, conf, kp_xy, kp_conf, face, facing, foot, pos_text, staff=None):

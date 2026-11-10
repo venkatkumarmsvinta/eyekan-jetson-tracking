@@ -1,5 +1,16 @@
 """All settings in one place. Change values here, not in the other modules."""
+import os
 from pathlib import Path
+
+# ---------- paths (every file the code reads or writes lives under DATA_DIR) ----------
+ROOT = Path(__file__).resolve().parent.parent
+DATA_DIR = Path(os.environ.get("EYEKAN_DATA_DIR", ROOT / "data"))  # git-ignored; set EYEKAN_DATA_DIR to move it
+VIDEO_DIR = DATA_DIR / "videos"        # recordings: <camera>.mp4
+CALIB_DIR = DATA_DIR / "calibration"   # per-camera calibration: <camera>.json, store_points.csv
+PHOTO_DIR = DATA_DIR / "photos"        # local copy of the staff face photos (from Supabase)
+MODEL_DIR = DATA_DIR / "models"        # RF-DETR weights (downloaded on first use)
+OUTPUT_DIR = DATA_DIR / "output"       # results: <video name>/rfdetr.mp4, rfdetr.csv, floor_map.png
+LOG_DIR = DATA_DIR / "logs"            # cron logs (staff photo sync)
 
 # ---------- models ----------
 POSE_MODEL = "usyd-community/vitpose-base-simple"  # ViTPose-B, COCO 17 keypoints, downloaded on first use
@@ -58,11 +69,11 @@ CAMERA_GROUPS = {
     "store_test": {"camera1": 0, "camera6": 805},
 }
 
-# ---------- database (Supabase, see tracking/db.py) ----------
+# ---------- database (Supabase, see tracking/cloud/db.py) ----------
 STAFF_PHOTO_BUCKET = "staff-photos"   # private bucket: {org_id}/{staff_id}/{n}.jpg
-STAFF_PHOTO_DIR = Path(__file__).resolve().parent.parent / "photo"  # <project>/photo: local copy of the staff face photos (git-ignored)
+STAFF_PHOTO_DIR = PHOTO_DIR           # {emp_id}/{n}.jpg + embeddings.json
 
-# ---------- face embeddings (InsightFace, see tracking/faces.py) ----------
+# ---------- face embeddings (InsightFace, see tracking/staff/faces.py) ----------
 FACE_MODEL = "buffalo_l"     # SCRFD detector + ArcFace R50; weights are non-commercial only
 FACE_DET_SIZE = 320          # photos are scaled so the longer side is this many pixels before face detection
 STAFF_EMBED_FILE = STAFF_PHOTO_DIR / "embeddings.json"  # embeddings of the staff photos, next to them

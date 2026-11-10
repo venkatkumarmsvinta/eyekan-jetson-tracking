@@ -1,6 +1,6 @@
 """A calibrated camera: store position in metres (x, y on the floor, z up) <-> image pixels.
 
-Made by tools/calibrate_3d.py and saved as calibration/<camera>.json. Used by the multi-camera tracking to put
+Made by tools/calibrate_3d.py and saved as data/calibration/<camera>.json. Used by the multi-camera tracking to put
 every person on one store floor map: from the head pixel at the person's head height, or from the feet at z = 0.
 """
 import json
