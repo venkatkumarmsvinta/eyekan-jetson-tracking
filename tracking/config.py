@@ -48,7 +48,7 @@ SKELETON = [(5, 7), (7, 9), (6, 8), (8, 10), (5, 6), (5, 11), (6, 12), (11, 12),
 # ---------- output ----------
 CSV_COLUMNS = ["frame", "time_s", "track_id", "tracker_id", "x1", "y1", "x2", "y2", "conf",
                "face_conf", "facing", "head_x", "head_y", "foot_x_px", "foot_y_px", "foot_from",
-               "floor_x", "floor_y", "floor_unit"]
+               "floor_x", "floor_y", "floor_unit", "staff", "staff_score"]
 
 # ---------- multi-camera ----------
 # Frame offset per camera so that the same frame index = the same moment, from the burned-in clocks
@@ -66,3 +66,9 @@ STAFF_PHOTO_DIR = Path(__file__).resolve().parent.parent / "photo"  # <project>/
 FACE_MODEL = "buffalo_l"     # SCRFD detector + ArcFace R50; weights are non-commercial only
 FACE_DET_SIZE = 320          # photos are scaled so the longer side is this many pixels before face detection
 STAFF_EMBED_FILE = STAFF_PHOTO_DIR / "embeddings.json"  # embeddings of the staff photos, next to them
+FACE_EVERY_S = 0.33        # check a track's face at most this often (seconds)
+FACE_MAX_PER_TRACK = 30    # faces collected per track, then its label is stable
+FACE_MIN_CONF = 0.7        # ViTPose face confidence needed before trying
+FACE_MIN_BOX_H = 250       # px: smaller people have too few face pixels
+STAFF_THRESHOLD = 0.25     # cosine similarity for "staff"; camera1 test: staff >= 0.30, customer/poster <= 0.09
+STAFF_MARGIN = 0.10        # best staff member must beat the second best by this much

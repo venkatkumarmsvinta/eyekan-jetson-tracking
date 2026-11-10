@@ -10,6 +10,7 @@ from .config import ANKLES, CSV_COLUMNS, FACE_POINTS, HOLD_S, POSTER_ZONES, REID
 from .detection import MODELS, PERSON, drop_duplicates, on_poster, overlaps_other
 from .drawing import draw_person
 from .floor import Floor, FloorMap
+from .identify import StaffMatcher
 from .keypoints import face_info, mean_point, person_crop, torso_colour, torso_visible
 from .pose import Pose
 from .relink import ReLink, apply_handovers
@@ -39,9 +40,10 @@ def run(video, size="nano", conf=0.25, show=False, max_frames=0):
     pose = Pose(device)
     tracker = make_tracker(fps, device)
     relink = ReLink(fps, load_reid(device))
+    matcher = StaffMatcher(fps)
     print("Model: RF-DETR {} | pose: ViTPose on {} | tracker: BoT-SORT, lost boxes kept {:g} s | ReLink remembers {:g} s, "
-          "re-ID {} | posters ignored: {} | floor calibration: {}".format(size, device, HOLD_S, REMEMBER_S, REID_WEIGHTS,
-                                                                        poster_zones or "none", floor.source))
+          "re-ID {} | posters ignored: {} | floor calibration: {} | staff faces: {} people".format(
+              size, device, HOLD_S, REMEMBER_S, REID_WEIGHTS, poster_zones or "none", floor.source, len(matcher.staff)))
 
     writer = cv2.VideoWriter(str(out_dir / "rfdetr.mp4"), cv2.VideoWriter_fourcc(*"avc1"), fps, (w, h))
     if not writer.isOpened():  # no H.264 encoder: mp4v (may not play in QuickTime)
@@ -81,6 +83,9 @@ def run(video, size="nano", conf=0.25, show=False, max_frames=0):
                     view = None if crop is None else (crop, torso_colour(frame, kp_xy[d], kp_conf[d]))
                 people.append((int(t[4]), body, y2 - y1, view, not overlaps_other(k, boxes)))
             ids = relink(frame_idx, people)
+            for k, t in enumerate(tracks):  # faces first, while the frame has no drawings on it
+                d = int(t[7])
+                matcher.update(frame_idx, frame, ids[k], boxes[k], kp_xy[d], kp_conf[d])
 
             now = {}  # ID -> floor position, for the map
             for k, t in enumerate(tracks):
@@ -91,16 +96,18 @@ def run(video, size="nano", conf=0.25, show=False, max_frames=0):
                 ankles = mean_point(kp_xy[d], kp_conf[d], ANKLES)
                 foot, foot_from = (ankles, "ankles") if ankles else (((x1 + x2) / 2, y2), "box")
                 fx, fy = floor(*foot)
+                staff, staff_score = matcher.label(tid)
                 ids_seen.add(tid)
                 floor_map.add(tid, fx, fy)
                 now[tid] = (fx, fy)
                 nd = 3 if floor.unit == "m" else 0
                 csv_w.writerow([frame_idx, round(frame_idx / fps, 2), tid, int(t[4]), x1, y1, x2, y2, round(score, 3),
                                 round(face, 3), facing, int(head[0]) if head else "", int(head[1]) if head else "",
-                                int(foot[0]), int(foot[1]), foot_from, round(fx, nd), round(fy, nd), floor.unit])
+                                int(foot[0]), int(foot[1]), foot_from, round(fx, nd), round(fy, nd), floor.unit,
+                                staff or "", round(staff_score, 3)])
                 n_boxes += 1
                 pos = "x {:.2f} y {:.2f} m".format(fx, fy) if floor.unit == "m" else "x {:.0f} y {:.0f} px".format(fx, fy)
-                draw_person(frame, boxes[k], tid, score, kp_xy[d], kp_conf[d], face, facing, foot, pos)
+                draw_person(frame, boxes[k], tid, score, kp_xy[d], kp_conf[d], face, facing, foot, pos, staff)
             writer.write(frame)
 
             if show:
@@ -131,5 +138,8 @@ def run(video, size="nano", conf=0.25, show=False, max_frames=0):
               relink.relinked, relink.handed_over, n_dupes, relink.n_embedded))
     for young, old, born in relink.handovers:
         print("  hand-over at {:.2f} s: ID {} -> {}".format(born / fps, young, old))
+    for tid in sorted(matcher.faces):
+        staff, score = matcher.label(tid)
+        print("  ID {}: {} ({} faces, best score {:.2f})".format(tid, staff or "not staff", len(matcher.faces[tid]), score))
     for name in ("rfdetr.mp4", "rfdetr.csv", "floor_map.png"):
         print("Saved: {}".format(out_dir / name))

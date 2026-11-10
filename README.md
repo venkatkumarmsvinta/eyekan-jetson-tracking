@@ -156,6 +156,8 @@ Daily refresh at 06:00 on the Jetson (`crontab -e`):
 0 6 * * *  cd /home/<user>/jetson-multi-tracking && venv-rfdetr/bin/python -m tracking.db >> logs/staff_sync.log 2>&1
 ```
 
+Technical design of staff recognition (architecture, data model, algorithms, evaluation): [docs/staff-recognition-technical-design.md](docs/staff-recognition-technical-design.md).
+
 ## Multi-camera preparation (branch `multicamera-tracking`)
 
 Goal: the same person keeps the same ID across cameras that see the same area (now: camera1 + camera6).

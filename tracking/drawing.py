@@ -5,7 +5,7 @@ from .config import SEEN, SKELETON
 from .floor import id_color
 
 
-def draw_person(frame, box, tid, conf, kp_xy, kp_conf, face, facing, foot, pos_text):
+def draw_person(frame, box, tid, conf, kp_xy, kp_conf, face, facing, foot, pos_text, staff=None):
     x1, y1, x2, y2 = box
     color = id_color(tid)
     cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
@@ -21,3 +21,5 @@ def draw_person(frame, box, tid, conf, kp_xy, kp_conf, face, facing, foot, pos_t
     cv2.putText(frame, "face {:.2f} {}".format(face, facing), (x1 + 2, max(y1 - 30, 40)),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
     cv2.putText(frame, pos_text, (x1 + 2, min(y2 + 22, frame.shape[0] - 6)), cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
+    if staff:
+        cv2.putText(frame, "STAFF " + staff, (x1 + 2, max(y1 - 54, 64)), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 200, 0), 2)
